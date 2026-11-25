@@ -90,7 +90,7 @@ td.c{text-align:center}td.r,th.r{text-align:right;font-variant-numeric:tabular-n
 td input[type=checkbox]{width:22px;height:22px;accent-color:var(--ok)}
 td input[type=number]{max-width:120px;text-align:right}
 .grp{font-weight:700;font-size:14px;color:var(--muted);margin-top:8px}
-.sched li .time{font:700 18px var(--display);min-width:64px;flex:none;font-variant-numeric:tabular-nums}
+.sched li .time{font:700 18px var(--display);width:118px;flex:none;font-variant-numeric:tabular-nums;border:1px solid var(--line);border-radius:8px;padding:6px 8px;min-height:44px;background:var(--bg);color:var(--ink)}
 .note{background:var(--coral-soft);border-radius:10px;padding:10px 14px;font-size:15px}
 .final{border:2px solid var(--coral)}
 footer{max-width:720px;margin:0 auto;padding:0 max(5vw,16px) 40px;font-size:14px;color:var(--muted)}
@@ -169,7 +169,7 @@ const esc = s => String(s).replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>'
 const clp = n => '$' + Math.round(n).toLocaleString('es-CL');
 
 /* ====== estado ====== */
-const blank = () => ({consent:null, uid:null, ans:null, done:{}, del:{}, own:{}, olv:{}, dec:{}, reg:{}, gast:{}, closed:false, fin:null});
+const blank = () => ({consent:null, uid:null, ans:null, done:{}, del:{}, own:{}, olv:{}, dec:{}, reg:{}, gast:{}, hrs:{}, closed:false, fin:null});
 let S = blank();
 try { const raw = localStorage.getItem(KEY); if (raw) S = Object.assign(blank(), JSON.parse(raw)); } catch(e) {}
 const save = () => { try { localStorage.setItem(KEY, JSON.stringify(S)); } catch(e) {} };
@@ -278,13 +278,13 @@ function tareas(c) {
   const T = (id, t, d, heavy, n) => L.push({id, t, d: dic(d), heavy: !!heavy, n: n || ''});
   if (c.nose) T('t-toca', 'Pregunta en el grupo familiar qué te toca este año', 2);
   if (TIERS[c.tier]) T('t-plata', 'Mira el reparto de la plata (sección Plata) y ajústalo', 3);
-  if (c.ncerc && !c.r('regninos')) T('t-lista', 'Completa para quién es cada regalo (sección Regalos)', 3);
+  if ((c.ncerc && !c.r('regninos')) || regalos(c).length) T('t-lista', 'Anota para quién es cada regalo y la idea (sección Regalos)', 3);
   if (a.comp.as) { T('t-as1', 'Confirma fecha, monto y a quién le regalas en el amigo secreto', 4); T('t-as2', 'Compra el regalo del amigo secreto', 11, true); }
-  if (c.cook && !c.r('menu')) T('t-menu', 'Elige el menú (sección Decisiones)', 5);
+  if (c.cook && !c.r('menu')) T('t-menu', 'Elige el menú (sección Comida)', 5);
   if (c.decorar && !c.r('deco')) T('t-deco', 'Saca la decoración y prueba las luces antes de colgarlas', 6, true);
   if (c.viaje) { T('t-viaje1', 'Revisa pasajes, peajes o bencina del viaje', 6); T('t-viaje2', 'Resuelve quién cuida a las mascotas y riega las plantas', 12); }
   if (c.ncerc && !c.r('regninos')) T('t-online', 'Compra online lo que necesita despacho', 8, true, 'Después del 10 los despachos se atrasan.');
-  if (c.host && a.pers.ad >= 6 && !c.r('trae')) T('t-trae', 'Manda al grupo quién trae qué (sección Decisiones)', 9);
+  if (c.host && a.pers.ad >= 6 && !c.r('trae')) T('t-trae', 'Manda al grupo familiar quién trae qué', 9);
   if (c.llevar) { T('t-llevar1', 'Confirma qué te toca llevar y para cuántos', 9); T('t-llevar2', 'Compra lo que llevas (lista de Compras)', 23, true); }
   if (a.comp.profes && !c.r('regcomp')) { T('t-prof1', 'Compra o arma los regalos de profesores', 10, true); T('t-prof2', 'Mándalos al colegio antes del último día de clases', 15, false, 'Confirma la fecha en la libreta o en el chat del curso.'); }
   if (c.cook) T('t-encargo', 'Encarga lo que se agota: pan de pascua bueno, carne o pavo', 12);
@@ -345,23 +345,21 @@ function decisiones(c) {
 
 function regalos(c) {
   const a = c.a, tr = TIERS[c.tier], L = [];
-  const R = (id, tipo, quien, idea, monto, lim) => L.push({id, tipo, quien, idea, monto, lim});
-  const dn = S.dec['d-ninos'], dad = S.dec['d-adultos'], dp = S.dec['d-profes'];
+  const R = (id, tipo, quien, ej, monto, lim) => L.push({id, tipo, quien, ej, monto, lim});
   let restante = tr ? tr.tot : 0;
   if (tr) {
-    restante -= a.comp.profes * (dp === 'tarjeta' ? 0 : tr.u) + a.comp.colegas * tr.u + a.comp.casa * tr.cas + a.comp.otros * tr.o;
+    restante -= (a.comp.profes + a.comp.colegas) * tr.u + a.comp.casa * tr.cas + a.comp.otros * tr.o;
     if (c.cook) restante -= comidaCosto(c);
   }
-  const wN = dn === 'chico' ? 1 : 1.6, wA = dad === 'ninos' ? 0 : dad === 'as' ? 0.6 : 1;
-  const pesos = a.cerc.ni * wN + a.cerc.ad * wA;
+  const wN = 1.6, pesos = a.cerc.ni * wN + a.cerc.ad;
   const unidad = tr && pesos ? Math.max(3000, Math.round(restante * 0.85 / pesos / 1000) * 1000) : null;
-  for (let i = 1; i <= a.cerc.ni; i++) R('r-n' + i, 'Cercanos', 'Niño o niña ' + i, dn === 'chico' ? 'Juguete chico + un libro' : 'Lo que pidió en la carta', unidad ? Math.round(unidad * wN / 1000) * 1000 : null, lim(20));
-  if (dad !== 'ninos') for (let i = 1; i <= a.cerc.ad; i++) R('r-a' + i, 'Cercanos', 'Adulto ' + i, dad === 'as' ? 'Amigo secreto' : 'Algo de uso: pijama, libro, planta', unidad ? Math.round(unidad * wA) : null, lim(20));
-  if (a.comp.profes) R('r-prof', 'Compromiso', 'Profesores (' + a.comp.profes + ')', dp === 'curso' ? 'Cuota del regalo colectivo' : dp === 'tarjeta' ? 'Tarjeta escrita por el niño' : 'Lo mismo para todas', tr && dp !== 'tarjeta' ? tr.u * a.comp.profes : null, 'antes del fin de clases');
-  if (a.comp.colegas) R('r-col', 'Compromiso', 'Colegas (' + a.comp.colegas + ')', 'Algo comestible e igual para todos', tr ? tr.u * a.comp.colegas : null, lim(16));
-  if (a.comp.as) R('r-as', 'Compromiso', 'Amigo secreto (' + a.comp.as + ')', 'Lo que fije el grupo', null, 'el día del intercambio');
-  if (a.comp.casa) R('r-casa', 'Compromiso', 'Quienes trabajan en la casa (' + a.comp.casa + ')', 'Aguinaldo en sobre', tr ? tr.cas * a.comp.casa : null, lim(19));
-  if (a.comp.otros) R('r-otros', 'Compromiso', 'Otros (' + a.comp.otros + ')', 'Aguinaldo en sobre o algo dulce', tr ? tr.o * a.comp.otros : null, lim(20));
+  for (let i = 1; i <= a.cerc.ni; i++) R('r-n' + i, 'Cercanos', 'Niño o niña ' + i, 'ej.: lo que pidió en la carta', unidad ? Math.round(unidad * wN / 1000) * 1000 : null, lim(20));
+  for (let i = 1; i <= a.cerc.ad; i++) R('r-a' + i, 'Cercanos', 'Adulto ' + i, 'ej.: un libro', unidad, lim(20));
+  for (let i = 1; i <= a.comp.profes; i++) R('r-prof' + i, 'Compromiso', 'Profesor o profesora ' + i, 'ej.: galletas', tr ? tr.u : null, 'antes del fin de clases');
+  for (let i = 1; i <= a.comp.colegas; i++) R('r-col' + i, 'Compromiso', 'Colega ' + i, 'ej.: chocolates', tr ? tr.u : null, lim(16));
+  for (let i = 1; i <= a.comp.as; i++) R('r-as' + i, 'Compromiso', 'Amigo secreto ' + i, 'ej.: un tazón', null, 'el día del intercambio');
+  for (let i = 1; i <= a.comp.casa; i++) R('r-casa' + i, 'Compromiso', 'Quien trabaja en la casa ' + i, 'ej.: aguinaldo en sobre', tr ? tr.cas : null, lim(19));
+  for (let i = 1; i <= a.comp.otros; i++) R('r-otros' + i, 'Compromiso', 'Otro ' + i, 'ej.: algo dulce', tr ? tr.o : null, lim(20));
   return L;
 }
 
@@ -389,7 +387,7 @@ function comida(c) {
     if (po === 'frio') I('c-postre', 'Ingredientes del postre frío', 'para ' + k.p, 'fresco');
     I('c-hielo', 'Hielo', Math.max(1, Math.ceil(k.p / 5)) + ' bolsas de 2 kg', 'fresco');
     I('c-serv', 'Servilletas y papel de cocina', '1 paquete de cada uno', 'no perecible');
-    out.previa = ['Cola de mono: el 21 o 22, al refri', m === 'asado' ? 'Carne: aliñada la noche del 23' : m === 'pavo' ? 'Pavo: descongelado en el refri desde el 21 si es congelado' : 'Pernil: aliñado la noche del 23', po === 'frio' ? 'Postre frío: el 23, al refri' : 'Helado: comprado el 23', 'Ensaladas: lavar el 23; aliñar justo antes de comer', 'Mesa: sillas y platos contados el 23'];
+    out.previa = ['Cola de mono: el 21 o 22, al refri', m === 'asado' ? 'Carne: aliñada la noche del 23' : m === 'pavo' ? 'Pavo: descongelado en el refri desde el 21 si es congelado' : m === 'pernil' ? 'Pernil: aliñado la noche del 23' : 'Plato principal: lo que se pueda dejar listo el 23', po === 'frio' ? 'Postre frío: el 23, al refri' : 'Helado: comprado el 23', 'Ensaladas: lavar el 23; aliñar justo antes de comer', 'Mesa: sillas y platos contados el 23'];
   } else if (c.llevar) {
     const l = S.dec['d-llevar'] || 'ensaladas', I = (id, t, q, g) => out.items.push({id, t, q, g});
     if (l === 'ensaladas') { I('l-tomate', 'Tomates y cebolla', Math.ceil(k.p * 0.15) + ' kg de tomate', 'fresco'); I('l-lechuga', 'Lechugas', Math.ceil(k.p / 6) + '', 'fresco'); }
@@ -424,28 +422,31 @@ function plata(c) {
 
 function horario(c) {
   const L = [];
+  const H = (dia, key, t, x) => L.push({dia, key, t: (S.hrs && S.hrs[key]) || t, x});
+  const m = S.dec['d-menu'] || 'pavo', k = personasCena(c);
   if (c.host && c.n24) {
-    const m = S.dec['d-menu'] || 'pavo', k = personasCena(c);
-    if (c.cook && m === 'pavo') { const kg = Math.max(3, Math.ceil(k.p / 2)), min = kg * 40 + 30; const h = 21 * 60 + 30 - min; L.push([hm(h), 'Pavo al horno (' + kg + ' kg a 180 °C: unos ' + Math.floor(kg * 40 / 60) + ' h ' + (kg * 40 % 60 ? kg * 40 % 60 + ' min ' : '') + 'más media hora de reposo)']); }
-    if (c.cook && m === 'pernil') L.push(['17:30', 'Pernil al horno (unas 3 h y media a 170 °C)']);
-    if (c.cook && m === 'asado') L.push(['19:30', 'Que alguien prenda el carbón']);
-    L.push(['19:00', 'Mesa puesta, hielo al freezer, bebidas al refri']);
-    L.push(['20:30', 'Llegan']);
-    L.push(['21:30', 'A comer']);
-    if (c.nkids) L.push(['00:00', 'Llega el Viejito Pascuero: regalos']);
+    if (c.cook && m === 'pavo') { const kg = Math.max(3, Math.ceil(k.p / 2)), min = kg * 40 + 30; H('24', 'h-pavo', hm(21 * 60 + 30 - min), 'Pavo al horno (' + kg + ' kg a 180 °C: unos ' + Math.floor(kg * 40 / 60) + ' h ' + (kg * 40 % 60 ? kg * 40 % 60 + ' min ' : '') + 'más media hora de reposo)'); }
+    if (c.cook && m === 'pernil') H('24', 'h-pernil', '17:30', 'Pernil al horno (unas 3 h y media a 170 °C)');
+    if (c.cook && m === 'asado') H('24', 'h-carbon', '19:30', 'Que alguien prenda el carbón');
+    H('24', 'h-mesa', '19:00', 'Mesa puesta, hielo al freezer, bebidas al refri');
+    H('24', 'h-llegan', '20:30', 'Llegan');
+    H('24', 'h-comer', '21:30', 'A comer');
+    if (c.nkids) H('24', 'h-viejito', '00:00', 'Llega el Viejito Pascuero: regalos');
   } else if (c.n24) {
-    L.push(['19:30', 'Junta los regalos y lo que llevas en la puerta']);
-    L.push(['20:00', 'Salida (ajusta según la distancia)']);
-    if (c.nkids) L.push(['00:00', 'Regalos de los niños']);
+    H('24', 'h-juntar', '19:30', 'Junta los regalos y lo que llevas en la puerta');
+    H('24', 'h-salida', '20:00', 'Salida (ajusta según la distancia)');
+    if (c.nkids) H('24', 'h-regalos', '00:00', 'Regalos de los niños');
   }
-  if (c.host && c.n25) { L.push(['11:00', 'Horno o fuego para el almuerzo del 25']); L.push(['13:30', 'Almuerzo']); }
-  return L.sort((x, y) => (x[0] === '00:00' ? 2400 : +x[0].replace(':', '')) - (y[0] === '00:00' ? 2400 : +y[0].replace(':', '')));
+  if (c.n25 && c.host) { H('25', 'h-fuego25', '11:00', 'Horno o fuego para el almuerzo'); H('25', 'h-alm25', '13:30', 'Almuerzo'); }
+  else if (c.n25) { H('25', 'h-juntar25', '12:00', 'Junta lo que llevas'); H('25', 'h-salida25', '12:30', 'Salida (ajusta según la distancia)'); }
+  const v = t => { const n = +t.replace(':', ''); return n < 600 ? n + 2400 : n; };
+  return L.sort((x, y) => x.dia === y.dia ? v(x.t) - v(y.t) : x.dia < y.dia ? -1 : 1);
 }
 const hm = m => { m = Math.round(m / 15) * 15; return String(Math.floor(m / 60)).padStart(2, '0') + ':' + String(m % 60).padStart(2, '0'); };
 const lim = n => DIAS[dic(n).getDay()].slice(0, 3) + ' ' + n;
 
 /* ====== render del plan ====== */
-const SECS = [['A','semana','Qué hacer cada semana'],['B','olvidos','¿Se te olvida algo?'],['C','decisiones','Decisiones pendientes'],['D','regalos','Regalos'],['E','comida','Comida'],['F','compras','Compras'],['G','plata','Plata'],['H','dia','El 24 y el 25, hora por hora']];
+const SECS = [['A','semana','Qué hacer cada semana'],['B','olvidos','¿Se te olvida algo?'],['C','regalos','Regalos'],['D','comida','Comida'],['E','compras','Compras'],['F','plata','Plata'],['G','dia','El 24 y el 25, hora por hora']];
 const openSince = {};
 
 function li(id, sec, t, n, origen, heavyTxt) {
@@ -500,16 +501,20 @@ function secHTML(key, c) {
     if (!L.length) return '<p class="small muted">Con lo que respondiste no hay regalos que organizar.</p>';
     const rows = g => L.filter(r => r.tipo === g).map(r => {
       const st = S.reg[r.id] || {};
-      return '<tr><td data-l="Para quién"><input type="text" maxlength="40" data-regq="' + r.id + '" value="' + esc(st.q || '') + '" placeholder="' + esc(r.quien) + '" aria-label="Para quién"></td><td data-l="Idea">' + esc(r.idea) + '</td><td data-l="Tope" class="r">' + (r.monto ? clp(r.monto) : '—') + '</td><td data-l="Hasta">' + esc(r.lim) + '</td><td data-l="Comprado" class="c"><input type="checkbox" data-reg="' + r.id + '" data-f="c" ' + (st.c ? 'checked' : '') + ' aria-label="Comprado"></td><td data-l="Envuelto" class="c"><input type="checkbox" data-reg="' + r.id + '" data-f="e" ' + (st.e ? 'checked' : '') + ' aria-label="Envuelto"></td></tr>';
+      return '<tr><td data-l="Para quién"><input type="text" maxlength="40" data-regq="' + r.id + '" value="' + esc(st.q || '') + '" placeholder="' + esc(r.quien) + '" aria-label="Para quién"></td><td data-l="Idea"><input type="text" maxlength="60" data-regi="' + r.id + '" value="' + esc(st.i || '') + '" placeholder="' + esc(r.ej) + '" aria-label="Idea de regalo"></td><td data-l="Tope" class="r">' + (r.monto ? clp(r.monto) : '—') + '</td><td data-l="Hasta">' + esc(r.lim) + '</td><td data-l="Comprado" class="c"><input type="checkbox" data-reg="' + r.id + '" data-f="c" ' + (st.c ? 'checked' : '') + ' aria-label="Comprado"></td><td data-l="Envuelto" class="c"><input type="checkbox" data-reg="' + r.id + '" data-f="e" ' + (st.e ? 'checked' : '') + ' aria-label="Envuelto"></td></tr>';
     }).join('');
     const tbl = (g, r) => r ? '<p class="grp">' + g + '</p><div class="scroll"><table class="stack"><thead><tr><th>Para quién</th><th>Idea</th><th class="r">Tope</th><th>Hasta</th><th>Comprado</th><th>Envuelto</th></tr></thead><tbody>' + r + '</tbody></table></div>' : '';
-    return '<p class="small muted">Escribe un apodo para cada uno ("mi mamá", "la del medio"): se queda solo en este aparato.</p>' + tbl('Cercanos', rows('Cercanos')) + tbl('De compromiso', rows('Compromiso'));
+    return '<p class="small muted">Una fila por persona. Escribe un apodo ("mi mamá", "la tía de inglés") y la idea de regalo: se quedan solo en este aparato.</p>' + tbl('Cercanos', rows('Cercanos')) + tbl('De compromiso', rows('Compromiso'));
   }
   if (key === 'comida') {
     const k = comida(c);
     if (!c.cook && !c.llevar) return '<p class="small muted">No te toca la comida. Si cambia, edita tus respuestas.</p>';
-    let h = '<p>' + (c.cook ? 'Para ' + c.p + ' personas' + (c.a.cel === 'ambas' ? ' (el 25 se repite con lo que sobra y un poco más)' : '') + '.' : 'Lo que llevas, para ' + c.p + ' personas.') + '</p>';
-    h += '<ul class="chk">' + k.items.map(x => '<li><span class="t"><span class="main">' + esc(x.t) + '</span><span class="n">' + esc(x.q) + '</span></span></li>').join('') + '</ul>';
+    const pick = (id, lab, opts, def) => { const v = S.dec[id] || def; return '<p class="grp">' + lab + '</p><div class="chips">' + opts.map(([o, t]) => '<button type="button" class="chip" data-pick="' + id + '" data-v="' + o + '" aria-pressed="' + (v === o) + '">' + t + '</button>').join('') + '</div>'; };
+    let h = '';
+    if (c.cook) h += pick('d-menu', 'Plato principal', [['pavo','Pavo'],['pernil','Pernil o lomo'],['asado','Asado'],['otra','Otro']], 'pavo') + pick('d-postre', 'Postre', [['pan','Pan de pascua y helado'],['frio','Postre frío hecho el 23'],['traen','Lo trae alguien']], 'pan');
+    else h += pick('d-llevar', 'Qué llevas', [['ensaladas','Ensaladas'],['postre','Postre'],['bebidas','Bebidas y hielo'],['otra','Otra cosa']], 'ensaladas');
+    h += '<p>' + (c.cook ? 'Cantidades para ' + c.p + ' personas' + (c.a.cel === 'ambas' ? ' (el 25 se repite con lo que sobra y un poco más)' : '') + ':' : 'Cantidades para ' + c.p + ' personas:') + '</p>';
+    h += k.items.length ? '<ul class="chk">' + k.items.map(x => '<li><span class="t"><span class="main">' + esc(x.t) + '</span><span class="n">' + esc(x.q) + '</span></span></li>').join('') + '</ul>' : '<p class="small muted">Agrega lo tuyo en Compras.</p>';
     if (k.previa.length) h += '<p class="grp">Lo que se adelanta</p><ul class="chk">' + k.previa.map((t, i) => S.del['p-' + i] ? '' : li('p-' + i, 'comida', t, '', 'gen')).join('') + '</ul>';
     return h;
   }
@@ -527,7 +532,8 @@ function secHTML(key, c) {
   if (key === 'dia') {
     const L = horario(c);
     if (!L.length) return '<p class="small muted">Celebras en otra fecha: vuelve cuando sepas la hora.</p>';
-    return '<ul class="chk sched">' + L.map(([t, x]) => '<li><span class="time">' + esc(t) + '</span><span class="t"><span class="main">' + esc(x) + '</span></span></li>').join('') + '</ul><p class="small muted">Horas de referencia; muévelas según tu familia.</p>';
+    const blk = d => { const r = L.filter(x => x.dia === d); return r.length ? '<h3>El ' + d + '</h3><ul class="chk sched">' + r.map(x => '<li><input type="time" class="time" data-hr="' + x.key + '" value="' + esc(x.t) + '" aria-label="Hora"><span class="t"><span class="main">' + esc(x.x) + '</span></span></li>').join('') + '</ul>' : ''; };
+    return '<p class="small muted">Cambia las horas según tu familia: se reordenan solas.</p>' + blk('24') + blk('25');
   }
   return '';
 }
@@ -571,6 +577,8 @@ $('secs').addEventListener('change', e => {
   if (t.dataset.id) { S.done[t.dataset.id] = t.checked; save(); if (t.checked) log('item_marcado', {sec: t.dataset.sec, origen: t.dataset.o}); else log('item_desmarcado', {sec: t.dataset.sec, origen: t.dataset.o}); rerenderKeepScroll(); }
   else if (t.dataset.dec) { S.dec[t.dataset.dec] = t.value; save(); log('decision', {id: t.dataset.dec, eleccion: t.value === 'otra' ? 'otra' : 'ofrecida', alt: t.value === 'otra' ? '' : t.value}); rerenderKeepScroll(); }
   else if (t.dataset.reg) { const r = S.reg[t.dataset.reg] = S.reg[t.dataset.reg] || {}; r[t.dataset.f] = t.checked; save(); if (t.checked) log('item_marcado', {sec: 'regalos', origen: 'gen', campo: t.dataset.f === 'c' ? 'comprado' : 'envuelto'}); }
+  else if (t.dataset.regi) { const r = S.reg[t.dataset.regi] = S.reg[t.dataset.regi] || {}; r.i = t.value.slice(0, 60); save(); }
+  else if (t.dataset.hr) { if (t.value) { S.hrs = S.hrs || {}; S.hrs[t.dataset.hr] = t.value; save(); rerenderKeepScroll(); } }
   else if (t.dataset.regq) { const r = S.reg[t.dataset.regq] = S.reg[t.dataset.regq] || {}; r.q = t.value.slice(0, 40); save(); }
   else if (t.dataset.gast) { S.gast[t.dataset.gast] = Math.max(0, +t.value || 0); save(); log('gasto_anotado', {cat: t.dataset.gast}); const g = Object.values(S.gast).reduce((s, v) => s + (+v || 0), 0); const el = $('gtot'); if (el) el.textContent = clp(g); }
 });
@@ -578,6 +586,7 @@ $('secs').addEventListener('click', e => {
   const b = e.target.closest('button'); if (!b) return;
   if (b.dataset.olv) { S.olv[b.dataset.olv] = b.dataset.v; save(); log(b.dataset.v === 'si' ? 'olvido_aceptado' : 'olvido_rechazado', {id: b.dataset.olv}); rerenderKeepScroll(); }
   else if (b.dataset.del) { S.del[b.dataset.del] = true; save(); log('item_borrado', {sec: b.dataset.sec, origen: b.dataset.o}); rerenderKeepScroll(); }
+  else if (b.dataset.pick) { S.dec[b.dataset.pick] = b.dataset.v; save(); log('decision', {id: b.dataset.pick, eleccion: b.dataset.v === 'otra' ? 'otra' : 'ofrecida', alt: b.dataset.v === 'otra' ? '' : b.dataset.v}); rerenderKeepScroll(); }
   else if (b.dataset.addb) addItem(b.dataset.addb);
 });
 $('secs').addEventListener('keydown', e => { if (e.key === 'Enter' && e.target.dataset.add) { e.preventDefault(); addItem(e.target.dataset.add); } });
