@@ -539,8 +539,8 @@ function secHTML(key, c) {
     let h = '';
     if (P) {
       const sug = {regalos: 0, comida: 0, otros: 0}; P.L.forEach(r => { if (r[0] !== 'colchon') sug[norm(r[0])] += r[2] || 0; });
-      const rows = cats.map(k => [k[0], k[1], sug[k[0]] || null]).concat(P.L.filter(r => r[0] === 'colchon'));
-      h += '<p>Reparto sugerido de ' + clp(P.tot) + '. Lo gastado se suma solo desde tu registro.</p><div class="scroll"><table><thead><tr><th>En qué</th><th class="r">Sugerido</th><th class="r">Gastado</th></tr></thead><tbody>' + rows.map(r => '<tr><td>' + esc(r[1]) + '</td><td class="r">' + (r[2] != null ? clp(r[2]) : '—') + '</td><td class="r">' + (r[0] === 'colchon' ? '—' : clp(sum(r[0]))) + '</td></tr>').join('') + '</tbody><tfoot><tr><td><b>Total</b></td><td class="r"><b>' + clp(P.tot) + '</b></td><td class="r"><b>' + clp(tot) + '</b></td></tr><tr><td>Te queda</td><td></td><td class="r"><b>' + clp(P.tot - tot) + '</b></td></tr></tfoot></table></div>';
+      const A = S.asig || {}, asig = k => A[k] != null ? A[k] : sug[k], tA = cats.reduce((a, k) => a + asig(k[0]), 0), libre = P.tot - tA;
+      h += '<p>Reparto sugerido de ' + clp(P.tot) + '. Cambia lo asignado si quieres: lo que bajas en una fila queda libre para subir otra. Lo gastado se suma solo desde tu registro.</p><div class="scroll"><table><thead><tr><th>En qué</th><th class="r">Asignado</th><th class="r">Gastado</th></tr></thead><tbody>' + cats.map(k => '<tr><td>' + esc(k[1]) + (asig(k[0]) !== sug[k[0]] ? '<br><span class="small muted">Sugerido: ' + clp(sug[k[0]]) + '</span>' : '') + '</td><td class="r"><input type="number" min="0" step="1000" inputmode="numeric" data-asig="' + k[0] + '" value="' + asig(k[0]) + '" aria-label="Asignado a ' + esc(k[1]) + '"></td><td class="r"' + (sum(k[0]) > asig(k[0]) ? ' style="color:var(--coral);font-weight:700"' : '') + '>' + clp(sum(k[0])) + '</td></tr>').join('') + '<tr><td>' + (libre < 0 ? 'Te pasaste del presupuesto' : 'Sin repartir (colchón para imprevistos)') + '</td><td class="r"' + (libre < 0 ? ' style="color:var(--coral);font-weight:700"' : '') + '>' + (libre < 0 ? '−' + clp(-libre) : clp(libre)) + '</td><td class="r">—</td></tr></tbody><tfoot><tr><td><b>Total</b></td><td class="r"><b>' + clp(P.tot) + '</b></td><td class="r"><b>' + clp(tot) + '</b></td></tr><tr><td>Te queda</td><td></td><td class="r"' + (P.tot - tot < 0 ? ' style="color:var(--coral)"' : '') + '><b>' + clp(P.tot - tot) + '</b></td></tr></tfoot></table></div>' + (S.asig ? '<p><button type="button" class="link" data-asigreset="1">Volver al reparto sugerido</button></p>' : '');
     } else h += '<p class="small muted">No diste un presupuesto. Igual puedes llevar el registro de lo que gastas.</p>';
     h += '<p class="grp">Registro de gastos</p>';
     h += G.length ? '<ul class="chk">' + G.map(g => '<li><span class="t"><span class="main">' + esc(g.t) + '</span><span class="n">' + esc(cats.find(k => k[0] === norm(g.c))[1]) + '</span></span><b style="white-space:nowrap">' + clp(g.m) + '</b><button type="button" class="del" data-xgasto="' + g.id + '" aria-label="Quitar gasto">×</button></li>').join('') + '</ul>' + (P ? '' : '<p><b>Total gastado: ' + clp(tot) + '</b></p>') : '<p class="small muted">Todavía no anotas gastos.</p>';
@@ -596,6 +596,7 @@ $('secs').addEventListener('change', e => {
   else if (t.dataset.dec) { S.dec[t.dataset.dec] = t.value; save(); log('decision', {id: t.dataset.dec, eleccion: t.value === 'otra' ? 'otra' : 'ofrecida', alt: t.value === 'otra' ? '' : t.value}); rerenderKeepScroll(); }
   else if (t.dataset.reg) { const r = S.reg[t.dataset.reg] = S.reg[t.dataset.reg] || {}; r[t.dataset.f] = t.checked; save(); if (t.checked) log('item_marcado', {sec: 'regalos', origen: 'gen', campo: t.dataset.f === 'c' ? 'comprado' : 'envuelto'}); }
   else if (t.dataset.regi) { const r = S.reg[t.dataset.regi] = S.reg[t.dataset.regi] || {}; r.i = t.value.slice(0, 60); save(); }
+  else if (t.dataset.asig) { S.asig = S.asig || {}; S.asig[t.dataset.asig] = Math.max(0, Math.round(+t.value || 0)); save(); rerenderKeepScroll(); }
   else if (t.dataset.hr) { if (t.value) { S.hrs = S.hrs || {}; S.hrs[t.dataset.hr] = t.value; save(); rerenderKeepScroll(); } }
   else if (t.dataset.regq) { const r = S.reg[t.dataset.regq] = S.reg[t.dataset.regq] || {}; r.q = t.value.slice(0, 40); save(); }
   else if (t.dataset.gast) { S.gast[t.dataset.gast] = Math.max(0, +t.value || 0); save(); log('gasto_anotado', {cat: t.dataset.gast}); const g = Object.values(S.gast).reduce((s, v) => s + (+v || 0), 0); const el = $('gtot'); if (el) el.textContent = clp(g); }
@@ -611,6 +612,7 @@ $('secs').addEventListener('click', e => {
   else if (b.dataset.adding) addIng(b.dataset.adding);
   else if (b.dataset.xing) { const pl = (S.platos || []).find(x => x.id === b.dataset.pl); if (pl) { pl.ing = (pl.ing || []).filter(i => i.id !== b.dataset.xing); save(); log('item_borrado', {sec: 'comida', origen: 'ingrediente'}); rerenderKeepScroll(); } }
   else if (b.dataset.addgasto) addGasto();
+  else if (b.dataset.asigreset) { delete S.asig; save(); rerenderKeepScroll(); }
   else if (b.dataset.xgasto) { S.gastos = (S.gastos || []).filter(g => g.id !== b.dataset.xgasto); save(); log('item_borrado', {sec: 'plata', origen: 'propio'}); rerenderKeepScroll(); }
   else if (b.dataset.addb) addItem(b.dataset.addb);
 });
