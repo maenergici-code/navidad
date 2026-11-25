@@ -533,15 +533,17 @@ function secHTML(key, c) {
   }
   if (key === 'plata') {
     const P = plata(c), G = S.gastos || [];
-    const cats = (P ? P.L.filter(r => r[0] !== 'colchon').map(r => [r[0], r[1]]) : []).concat([['otro', 'Otro']]);
-    const sum = k => G.filter(g => g.c === k).reduce((a, g) => a + g.m, 0), tot = G.reduce((a, g) => a + g.m, 0);
+    const cats = [['regalos', 'Regalos'], ['comida', 'Comida'], ['otros', 'Otros']];
+    const norm = k => (k === 'cerc' || k === 'comp' || k === 'regalos') ? 'regalos' : (k === 'comida' || k === 'llevar') ? 'comida' : 'otros';
+    const sum = k => G.filter(g => norm(g.c) === k).reduce((a, g) => a + g.m, 0), tot = G.reduce((a, g) => a + g.m, 0);
     let h = '';
     if (P) {
-      const rows = P.L.concat(sum('otro') ? [['otro', 'Otro', null]] : []);
+      const sug = {regalos: 0, comida: 0, otros: 0}; P.L.forEach(r => { if (r[0] !== 'colchon') sug[norm(r[0])] += r[2] || 0; });
+      const rows = cats.map(k => [k[0], k[1], sug[k[0]] || null]).concat(P.L.filter(r => r[0] === 'colchon'));
       h += '<p>Reparto sugerido de ' + clp(P.tot) + '. Lo gastado se suma solo desde tu registro.</p><div class="scroll"><table><thead><tr><th>En qué</th><th class="r">Sugerido</th><th class="r">Gastado</th></tr></thead><tbody>' + rows.map(r => '<tr><td>' + esc(r[1]) + '</td><td class="r">' + (r[2] != null ? clp(r[2]) : '—') + '</td><td class="r">' + (r[0] === 'colchon' ? '—' : clp(sum(r[0]))) + '</td></tr>').join('') + '</tbody><tfoot><tr><td><b>Total</b></td><td class="r"><b>' + clp(P.tot) + '</b></td><td class="r"><b>' + clp(tot) + '</b></td></tr><tr><td>Te queda</td><td></td><td class="r"><b>' + clp(P.tot - tot) + '</b></td></tr></tfoot></table></div>';
     } else h += '<p class="small muted">No diste un presupuesto. Igual puedes llevar el registro de lo que gastas.</p>';
     h += '<p class="grp">Registro de gastos</p>';
-    h += G.length ? '<ul class="chk">' + G.map(g => '<li><span class="t"><span class="main">' + esc(g.t) + '</span><span class="n">' + esc((cats.find(k => k[0] === g.c) || ['', 'Otro'])[1]) + '</span></span><b style="white-space:nowrap">' + clp(g.m) + '</b><button type="button" class="del" data-xgasto="' + g.id + '" aria-label="Quitar gasto">×</button></li>').join('') + '</ul>' + (P ? '' : '<p><b>Total gastado: ' + clp(tot) + '</b></p>') : '<p class="small muted">Todavía no anotas gastos.</p>';
+    h += G.length ? '<ul class="chk">' + G.map(g => '<li><span class="t"><span class="main">' + esc(g.t) + '</span><span class="n">' + esc(cats.find(k => k[0] === norm(g.c))[1]) + '</span></span><b style="white-space:nowrap">' + clp(g.m) + '</b><button type="button" class="del" data-xgasto="' + g.id + '" aria-label="Quitar gasto">×</button></li>').join('') + '</ul>' + (P ? '' : '<p><b>Total gastado: ' + clp(tot) + '</b></p>') : '<p class="small muted">Todavía no anotas gastos.</p>';
     h += '<div class="card" style="gap:8px"><input type="text" id="g-t" maxlength="50" placeholder="Qué compraste (ej.: regalo de mi mamá)" aria-label="Qué compraste"><div class="add"><select id="g-c" aria-label="Categoría" style="font:16px var(--body);min-height:44px;border:1px solid var(--line);border-radius:8px;background:var(--bg);color:var(--ink);padding:0 8px;flex:1">' + cats.map(k => '<option value="' + k[0] + '">' + esc(k[1]) + '</option>').join('') + '</select><input type="number" id="g-m" min="0" step="500" inputmode="numeric" placeholder="Monto" aria-label="Monto" style="max-width:140px"><button type="button" data-addgasto="1">Anotar</button></div></div>';
     return h;
   }
