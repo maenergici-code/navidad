@@ -169,7 +169,7 @@ const esc = s => String(s).replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>'
 const clp = n => '$' + Math.round(n).toLocaleString('es-CL');
 
 /* ====== estado ====== */
-const blank = () => ({consent:null, uid:null, ans:null, done:{}, del:{}, own:{}, olv:{}, dec:{}, reg:{}, gast:{}, hrs:{}, menu:{}, platos:[], closed:false, fin:null});
+const blank = () => ({consent:null, uid:null, ans:null, done:{}, del:{}, own:{}, olv:{}, dec:{}, reg:{}, gast:{}, hrs:{}, menu:{}, platos:[], gastos:[], closed:false, fin:null});
 let S = blank();
 try { const raw = localStorage.getItem(KEY); if (raw) S = Object.assign(blank(), JSON.parse(raw)); } catch(e) {}
 const save = () => { try { localStorage.setItem(KEY, JSON.stringify(S)); } catch(e) {} };
@@ -277,7 +277,7 @@ function tareas(c) {
   const a = c.a, L = [];
   const T = (id, t, d, heavy, n) => L.push({id, t, d: dic(d), heavy: !!heavy, n: n || ''});
   if (c.nose) T('t-toca', 'Pregunta en el grupo familiar qué te toca este año', 2);
-  if (TIERS[c.tier]) T('t-plata', 'Mira el reparto de la plata (sección Plata) y ajústalo', 3);
+  if (TIERS[c.tier]) T('t-plata', 'Mira el reparto de la plata (sección Plata)', 3);
   if ((c.ncerc && !c.r('regninos')) || regalos(c).length) T('t-lista', 'Anota para quién es cada regalo y la idea (sección Regalos)', 3);
   if (a.comp.as) { T('t-as1', 'Confirma fecha, monto y a quién le regalas en el amigo secreto', 4); T('t-as2', 'Compra el regalo del amigo secreto', 11, true); }
   if (c.cook && !c.r('menu')) T('t-menu', 'Elige el menú (sección Comida)', 5);
@@ -396,7 +396,7 @@ function comida(c) {
   CAT.forEach(d => { if (!platoOn(c, d)) return; out.sel.push(d.id);
     d.it(k).forEach(([id, t, q, g]) => out.items.push({id, t, q, g}));
     if (d.pre && c.cook) out.previa.push({id: 'p-' + d.id, t: d.pre}); });
-  (S.platos || []).forEach(x => out.items.push({id: x.id, t: 'Ingredientes para: ' + x.t, q: '', g: 'fresco'}));
+  (S.platos || []).forEach(x => { const ing = x.ing || []; if (ing.length) ing.forEach(i => out.items.push({id: i.id, t: i.t, q: i.q, g: 'fresco'})); else out.items.push({id: x.id, t: 'Ingredientes para: ' + x.t, q: '', g: 'fresco'}); });
   if (c.cook && out.items.length) { out.previa.push({id: 'p-ens', t: 'Verduras: lavar el 23; aliñar justo antes de comer'}); out.previa.push({id: 'p-mesa', t: 'Mesa: sillas y platos contados el 23'}); }
   return out;
 }
@@ -518,7 +518,7 @@ function secHTML(key, c) {
     let h = '<p class="small muted">' + (c.cook ? 'Marca lo que vas a servir y agrega lo que falte.' : 'Marca lo que llevas. Si te pidieron algo específico, escríbelo abajo.') + ' Con eso se arma la lista del supermercado.</p>';
     h += PLATOS.map(([g, lab]) => '<p class="grp">' + lab + '</p><div class="chips">' + CAT.filter(d => d.g === g).map(d => '<button type="button" class="chip" data-plato="' + d.id + '" aria-pressed="' + platoOn(c, d) + '">' + d.t + '</button>').join('') + '</div>').join('');
     h += '<p class="grp">' + (c.cook ? 'Otros platos' : 'Algo específico que te pidieron') + '</p>';
-    if ((S.platos || []).length) h += '<div class="chips">' + S.platos.map(x => '<button type="button" class="chip" aria-pressed="true" data-xplato="' + x.id + '" aria-label="Quitar ' + esc(x.t) + '">' + esc(x.t) + ' ×</button>').join('') + '</div>';
+    h += (S.platos || []).map(x => '<div class="card" style="gap:8px"><div class="row" style="justify-content:space-between"><b>' + esc(x.t) + '</b><button type="button" class="del" data-xplato="' + x.id + '" aria-label="Quitar ' + esc(x.t) + '">×</button></div>' + ((x.ing || []).length ? '<ul class="chk">' + x.ing.map(i => '<li><span class="t"><span class="main">' + esc(i.t) + '</span>' + (i.q ? '<span class="n">' + esc(i.q) + '</span>' : '') + '</span><button type="button" class="del" data-xing="' + i.id + '" data-pl="' + x.id + '" aria-label="Quitar ingrediente">×</button></li>').join('') + '</ul>' : '<p class="small muted">Desglosa los ingredientes: pasan a la lista del supermercado.</p>') + '<div class="add"><input type="text" maxlength="50" placeholder="Ingrediente (ej.: camarones)" data-ingt="' + x.id + '" aria-label="Ingrediente"><input type="text" maxlength="30" placeholder="Cantidad (ej.: 500 g)" data-ingq="' + x.id + '" aria-label="Cantidad" style="max-width:150px"><button type="button" class="alt" data-adding="' + x.id + '">Agregar</button></div></div>').join('');
     h += '<div class="add"><input type="text" id="newplato" maxlength="60" placeholder="ej.: ensalada de papas de mi mamá" aria-label="Agregar un plato"><button type="button" class="alt" data-addplato="1">Agregar</button></div>';
     if (k.items.length) h += '<p class="grp">Cantidades para ' + c.p + ' personas' + (c.a.cel === 'ambas' && c.cook ? ' (el 25 se repite con lo que sobra y un poco más)' : '') + '</p><ul class="chk">' + k.items.map(x => '<li><span class="t"><span class="main">' + esc(x.t) + '</span>' + (x.q ? '<span class="n">' + esc(x.q) + '</span>' : '<span class="n">Anota los ingredientes en la lista del supermercado.</span>') + '</span></li>').join('') + '</ul>';
     const pv = k.previa.filter(x => !S.del[x.id]);
@@ -532,9 +532,18 @@ function secHTML(key, c) {
     return '<p class="grp">No perecible: cuando puedas</p><ul class="chk">' + g('no perecible') + '</ul><p class="grp">Fresco: el 23</p><ul class="chk">' + g('fresco') + '</ul>' + (own('compras').length ? '<p class="grp">Lo que agregaste</p><ul class="chk">' + own('compras').map(x => li(x.id, 'compras', x.t, '', 'propio')).join('') + '</ul>' : '') + addBox('compras');
   }
   if (key === 'plata') {
-    const P = plata(c);
-    if (!P) return '<p class="small muted">No diste un presupuesto. Puedes anotar lo gastado igual:</p>' + gastTable([['todo', 'Gastado en total', null]], null);
-    return '<p>Reparto sugerido de ' + clp(P.tot) + '. Anota lo gastado de verdad.</p>' + gastTable(P.L, P.tot);
+    const P = plata(c), G = S.gastos || [];
+    const cats = (P ? P.L.filter(r => r[0] !== 'colchon').map(r => [r[0], r[1]]) : []).concat([['otro', 'Otro']]);
+    const sum = k => G.filter(g => g.c === k).reduce((a, g) => a + g.m, 0), tot = G.reduce((a, g) => a + g.m, 0);
+    let h = '';
+    if (P) {
+      const rows = P.L.concat(sum('otro') ? [['otro', 'Otro', null]] : []);
+      h += '<p>Reparto sugerido de ' + clp(P.tot) + '. Lo gastado se suma solo desde tu registro.</p><div class="scroll"><table><thead><tr><th>En qué</th><th class="r">Sugerido</th><th class="r">Gastado</th></tr></thead><tbody>' + rows.map(r => '<tr><td>' + esc(r[1]) + '</td><td class="r">' + (r[2] != null ? clp(r[2]) : '—') + '</td><td class="r">' + (r[0] === 'colchon' ? '—' : clp(sum(r[0]))) + '</td></tr>').join('') + '</tbody><tfoot><tr><td><b>Total</b></td><td class="r"><b>' + clp(P.tot) + '</b></td><td class="r"><b>' + clp(tot) + '</b></td></tr><tr><td>Te queda</td><td></td><td class="r"><b>' + clp(P.tot - tot) + '</b></td></tr></tfoot></table></div>';
+    } else h += '<p class="small muted">No diste un presupuesto. Igual puedes llevar el registro de lo que gastas.</p>';
+    h += '<p class="grp">Registro de gastos</p>';
+    h += G.length ? '<ul class="chk">' + G.map(g => '<li><span class="t"><span class="main">' + esc(g.t) + '</span><span class="n">' + esc((cats.find(k => k[0] === g.c) || ['', 'Otro'])[1]) + '</span></span><b style="white-space:nowrap">' + clp(g.m) + '</b><button type="button" class="del" data-xgasto="' + g.id + '" aria-label="Quitar gasto">×</button></li>').join('') + '</ul>' + (P ? '' : '<p><b>Total gastado: ' + clp(tot) + '</b></p>') : '<p class="small muted">Todavía no anotas gastos.</p>';
+    h += '<div class="card" style="gap:8px"><input type="text" id="g-t" maxlength="50" placeholder="Qué compraste (ej.: regalo de mi mamá)" aria-label="Qué compraste"><div class="add"><select id="g-c" aria-label="Categoría" style="font:16px var(--body);min-height:44px;border:1px solid var(--line);border-radius:8px;background:var(--bg);color:var(--ink);padding:0 8px;flex:1">' + cats.map(k => '<option value="' + k[0] + '">' + esc(k[1]) + '</option>').join('') + '</select><input type="number" id="g-m" min="0" step="500" inputmode="numeric" placeholder="Monto" aria-label="Monto" style="max-width:140px"><button type="button" data-addgasto="1">Anotar</button></div></div>';
+    return h;
   }
   if (key === 'dia') {
     const L = horario(c);
@@ -597,9 +606,15 @@ $('secs').addEventListener('click', e => {
   else if (b.dataset.plato) { const d = CAT.find(x => x.id === b.dataset.plato), on = !platoOn(ctx(), d); S.menu = S.menu || {}; S.menu[d.id] = on; save(); log('decision', {id: 'plato', alt: d.id, eleccion: on ? 'agrega' : 'quita'}); rerenderKeepScroll(); }
   else if (b.dataset.xplato) { S.platos = (S.platos || []).filter(x => x.id !== b.dataset.xplato); save(); log('item_borrado', {sec: 'comida', origen: 'propio'}); rerenderKeepScroll(); }
   else if (b.dataset.addplato) addPlato();
+  else if (b.dataset.adding) addIng(b.dataset.adding);
+  else if (b.dataset.xing) { const pl = (S.platos || []).find(x => x.id === b.dataset.pl); if (pl) { pl.ing = (pl.ing || []).filter(i => i.id !== b.dataset.xing); save(); log('item_borrado', {sec: 'comida', origen: 'ingrediente'}); rerenderKeepScroll(); } }
+  else if (b.dataset.addgasto) addGasto();
+  else if (b.dataset.xgasto) { S.gastos = (S.gastos || []).filter(g => g.id !== b.dataset.xgasto); save(); log('item_borrado', {sec: 'plata', origen: 'propio'}); rerenderKeepScroll(); }
   else if (b.dataset.addb) addItem(b.dataset.addb);
 });
-$('secs').addEventListener('keydown', e => { if (e.key !== 'Enter') return; if (e.target.dataset.add) { e.preventDefault(); addItem(e.target.dataset.add); } else if (e.target.id === 'newplato') { e.preventDefault(); addPlato(); } });
+$('secs').addEventListener('keydown', e => { if (e.key !== 'Enter') return; if (e.target.dataset.add) { e.preventDefault(); addItem(e.target.dataset.add); } else if (e.target.id === 'newplato') { e.preventDefault(); addPlato(); } else if (e.target.dataset.ingt || e.target.dataset.ingq) { e.preventDefault(); addIng(e.target.dataset.ingt || e.target.dataset.ingq); } else if (e.target.id === 'g-t' || e.target.id === 'g-m') { e.preventDefault(); addGasto(); } });
+function addIng(pid) { const pl = (S.platos || []).find(x => x.id === pid), ti = document.querySelector('[data-ingt="' + pid + '"]'), qi = document.querySelector('[data-ingq="' + pid + '"]'); const v = (ti.value || '').trim(); if (!pl || !v) { ti.focus(); return; } (pl.ing = pl.ing || []).push({id: 'i-' + Date.now().toString(36), t: v.slice(0, 50), q: (qi.value || '').trim().slice(0, 30)}); save(); log('item_agregado', {sec: 'comida', tipo: 'ingrediente'}); rerenderKeepScroll(); const n = document.querySelector('[data-ingt="' + pid + '"]'); if (n) n.focus(); }
+function addGasto() { const t = ($('g-t').value || '').trim(), m = Math.round(+$('g-m').value || 0), cat = $('g-c').value; if (!t || m <= 0) { (t ? $('g-m') : $('g-t')).focus(); return; } (S.gastos = S.gastos || []).push({id: 'g-' + Date.now().toString(36), t: t.slice(0, 50), m, c: cat}); save(); log('gasto_anotado', {cat}); rerenderKeepScroll(); }
 function addPlato() { const inp = $('newplato'), v = (inp.value || '').trim(); if (!v) return; (S.platos = S.platos || []).push({id: 'x-' + Date.now().toString(36), t: v.slice(0, 60)}); save(); log('item_agregado', {sec: 'comida'}); rerenderKeepScroll(); }
 function addItem(sec) {
   const inp = document.querySelector('[data-add="' + sec + '"]'); const v = (inp.value || '').trim(); if (!v) return;
